@@ -23,33 +23,48 @@ or send a letter to Creative Commons, 444 Castro Street, Suite 900, Mountain Vie
 //
 // Hardware configuration
 //
+#define CE_PIN 9
+#define CSN_PIN 10
 
 // Set up nRF24L01 radio on SPI bus plus pins 9 & 10
-RF24 radio(9,10);
+RF24 radio(CE_PIN, CSN_PIN); // Create a Radio
 
 Servo servo; //steering servo declaration 
 Servo esc; // Electronic Speed Contoller declaration
+
+int Servo_X;  
+int Servo_Y;  
+byte ESC_speed;
+int ESC_value;
 
 // Single radio pipe address for the 2 nodes to communicate.
 const uint64_t pipe = 0xE8E8F0F0E1LL;
 
 //
-// Payload
+// Setup NRF24
 //
 
 uint8_t received_data[2];
 uint8_t num_received_data =sizeof(received_data);
 
 //
-// Setup
+// Setup ESC
 //
+#define motA    3
+#define motB    6
+#define ServoPin    5
 
 void setup(void)
 {
-  delay(3000); //wait until the esc starts in case of Arduino got power first
-  servo.attach(3);  // attaches the servo on pin 3 to the servo object 
-  esc.attach(6);  // attaches the ESC on pin 6 to the ese object  
+  delay(1000); //wait until the esc starts in case of Arduino got power first
+  servo.attach(ServoPin);  // attaches the servo on pin 3 to the servo object 
+  //esc.attach(6);  // attaches the ESC on pin 6 to the ese object  
+  pinMode(motA, OUTPUT);
+  pinMode(motB, OUTPUT);
+  
   servo.write(90);
+  ESC_value=500;
+ 
   //
   // Print preamble
   //
@@ -64,6 +79,7 @@ void setup(void)
   radio.begin(); //Begin operation of the chip.
   // This simple sketch opens a single pipes for these two nodes to communicate
   // back and forth.  One listens on it, the other talks to it.
+  radio.setDataRate(RF24_250KBPS); // Both endpoints must have this set the same
   radio.openReadingPipe(1,pipe);
   radio.startListening();
   //
@@ -79,15 +95,43 @@ void loop(void)
   if ( radio.available() )
   {
     bool done = false;
-    int ESC_value;
+
     while (!done)
     {
       // Fetch the payload, and see if this was the last one.
+
       done = radio.read( received_data, num_received_data );
-      ESC_value=received_data[0]*10; //Multiplication by 10 because the ESC operates for vlues around 1500 and the nRF24L01 can transmit maximum of 255 per packet 
-      esc.writeMicroseconds(ESC_value);
+      ESC_value=received_data[0]; //Multiplication by 10 because the ESC operates for vlues around 1500 and the nRF24L01 can transmit maximum of 255 per packet 
+      Servo_X=map(ESC_value, 255, 0, 0, 1023); 
+      Serial.print(" esc:\n\r"); 
+      Serial.print(Servo_X);
+// Start ESC bi direction , if joy in the middle set motA and B to low to avoid jogging 
+  if (Servo_X >480 && Servo_X <520) {
+    analogWrite(motA, 0);
+    analogWrite(motB, 0); 
+  }
+  else if (Servo_X <489){            
+    ESC_speed = map(Servo_X, 0,497,255, 0); //Reverse 0 is the fastest
+    analogWrite(motA, ESC_speed);
+    analogWrite(motB, 0); 
+  }
+  else if (Servo_X >524){
+    ESC_speed = map(Servo_X, 524,1023,0, 255);  //Forward 1023 is the fastest
+    analogWrite(motA, 0);
+    analogWrite(motB, ESC_speed); 
+  }
+  else{                                // set MotA and B to low to avoid unwanted start
+    analogWrite(motA, 0);
+    analogWrite(motB, 0);  
+  }
+
+      //esc.writeMicroseconds(ESC_value);
     //  Serial.println(ESC_value);
-      servo.write((received_data[1]));
+      Servo_Y=received_data[1];
+      Servo_Y=map(Servo_Y,255,0,128,68 );
+      servo.write((Servo_Y));
+      Serial.print(" servo\n\r"); 
+      Serial.print(received_data[1]);
      // Serial.println(received_data[1]);
     }
   }

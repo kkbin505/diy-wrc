@@ -1,6 +1,12 @@
 diy-wrc
 =======
 
+### Update 2022/6/4
+
+Add esc control code to Rx
+Use 2 wires to control a L9110 H bridge chip, make a very simple brushed bidirection esc for rc car (500mA only)
+
+
 DIY Wireless Remote Control
 
 The aim of the project is to build Transmitter and Receiver by using a cheap
